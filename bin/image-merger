@@ -41,7 +41,7 @@ export IMAGE_MERGER_ROOT="$ROOT"
 # ... and Pillow's _imaging) cannot resolve the CPython API and fail with
 # "undefined symbol: PyFloat_Type".  LD_PRELOAD loads libpython3 with global
 # scope (RTLD_GLOBAL) before chez-python starts, which fixes that.
-case ":$LD_PRELOAD:" in
+case ":${LD_PRELOAD:-}:" in
   *:libpython3*:*|*/libpython3*) ;;
   *)
     LIBPYTHON=$(ldconfig -p 2>/dev/null | awk '/^[[:space:]]*libpython3\.so /{print $NF; exit}')

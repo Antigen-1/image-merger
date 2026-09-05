@@ -161,6 +161,33 @@ image-merger/
     test-*.sps
 ```
 
+
+## Portability
+
+Verified target: **Linux x86-64 (glibc)**.  Other platforms are best-effort:
+
+- **Run time** needs only `scheme` on `$PATH`, the system `libpython3.so`
+  (same minor as the venv), and the venv with Pillow (>= 9.1, for
+  `Image.Resampling`).  chez-python itself is *not* needed at run time, but
+  its `chez-python.boot` must be installed where the scheme binary looks for
+  boots (the standard chez-python install layout: boot file next to the real
+  scheme binary).  Tested with a minimal `PATH=/usr/bin:/bin` environment.
+- **Build time** needs `chez-python` on `$PATH`, GNU make, `python3` and
+  (for `make test`) akku.  Building from another directory works
+  (`make -C <dir> build`).  No chez-python source tree or library path is
+  required: the boot records chez-python as its base image by name
+  (`allowed-libraries '("chez-python")`).
+- **Python preload workaround**: `bin/image-merger` uses `LD_PRELOAD`
+  (Linux/glibc only) so Python's C-extension modules can resolve the CPython
+  API when the interpreter is embedded.  On macOS this needs an equivalent
+  (e.g. `DYLD_INSERT_LIBRARIES` with the full `libpython3.dylib` path) and is
+  untested; Windows is unsupported (shell wrapper, preload mechanism, path
+  separators).
+- **Path handling** is Unix-style ('/' separators, config-relative
+  resolution); paths containing spaces work.  The venv must be created with a
+  Python whose minor version matches the embedded libpython (the runner
+  derives the site-packages path from the embedded version).
+
 ## License
 
 MIT — see `LICENSE`.
