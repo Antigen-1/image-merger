@@ -11,8 +11,7 @@ MAIN_SS   := $(BUILD_DIR)/im-main.ss
 # The installed chez-python (on $PATH) is used to *build* the boot file: its
 # in-process library registry resolves the chez-python imports of our libraries
 # during make-boot-file, so no chez-python source tree or library path is
-# needed.  Its boot file is used as the chain base of our own boot.
-CHZ_BOOT := $(shell dirname $(shell readlink -f $(shell command -v chez-python)))/chez-python.boot
+# needed.
 
 # The image-merger Scheme libraries compiled into the cached boot.
 IM_SLS := image-merger/config.sls image-merger/layout.sls \
@@ -20,13 +19,15 @@ IM_SLS := image-merger/config.sls image-merger/layout.sls \
 
 all: test
 
-# --- Compile the Scheme code once into a cached chain boot ------------------
-# image-merger.boot = the installed chez-python boot (chain base, provides
-# the chez-python libraries) + the image-merger libraries + our own whole
-# program with a custom scheme-start (im-main.ss).  The boot is built by
-# chez-python itself (its loaded libraries resolve our imports at compile
-# time); running it starts our program directly: no chez-python REPL, no
-# script loading - the config file is a plain argv argument.
+# --- Compile the Scheme code once into a cached boot ------------------------
+# image-merger.boot = our own whole program (custom scheme-start) + the
+# image-merger libraries, built ON TOP of chez-python as the sole base image:
+# allowed-libraries '("chez-python") records the base by name, so the
+# chez-python libraries are not embedded.  At run time `scheme -b` loads our
+# boot and then chez-python.boot (which itself loads scheme.boot) from the
+# scheme boot search path.  Running the boot starts our program directly: no
+# chez-python REPL, no script loading - the config file is a plain argv
+# argument.
 build: $(BOOT)
 
 # Our boot program: whole-program compile im-main.ss inside the build dir so
@@ -39,10 +40,9 @@ $(MAIN_SO): im-main.ss
 	@echo '(compile-whole-program "$(abspath $(BUILD_DIR)/im-main.wpo)"' \
 	      '"$(abspath $(MAIN_SO))" #t)' | chez-python -q
 
-$(BOOT): $(IM_SLS) $(MAIN_SO) $(CHZ_BOOT)
+$(BOOT): $(IM_SLS) $(MAIN_SO)
 	@mkdir -p $(BUILD_DIR)
-	@echo "(make-boot-file \"$(abspath $(BOOT)).tmp\" '(\"scheme\") \
-	       \"$(CHZ_BOOT)\" \
+	@echo "(make-boot-file \"$(abspath $(BOOT)).tmp\" '(\"chez-python\") \
 	       $(foreach f,$(IM_SLS),\"$(abspath $(f))\" )\
 	       \"$(abspath $(MAIN_SO))\" )" | chez-python -q
 	@mv "$(abspath $(BOOT)).tmp" "$(abspath $(BOOT))"

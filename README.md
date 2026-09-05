@@ -28,12 +28,16 @@ make run CFG=examples/demo.cfg      # run with a config file
 bin/image-merger <config-file>      # same, directly
 ```
 
-- `make build` creates the cached **boot file** `.build/image-merger.boot`,
-  built *by chez-python*: the installed `chez-python.boot` acts as the chain
-  base (it supplies the chez-python libraries) and the compiled
+- `make build` creates the cached **boot file** `.build/image-merger.boot`
+  (only ~63 KB), built *by chez-python*: the compiled
   `(image-merger config/layout/spec/runner)` libraries plus our own whole
-  program (`im-main.ss`) are linked on top. The boot is rebuilt automatically
-  when the libraries or the installed chez-python boot change.
+  program (`im-main.ss`) are linked **on top of chez-python as the sole base
+  image** (`make-boot-file` allowed-libraries `'("chez-python")`). The
+  chez-python libraries are therefore *not embedded*: at run time `scheme -b`
+  loads our boot, then `chez-python.boot` (which itself loads `scheme.boot`)
+  from the scheme boot search path — so chez-python must be installed where
+  the scheme binary can find its boot. The boot is rebuilt automatically when
+  the libraries or `im-main.ss` change.
 - The boot carries its own **custom `scheme-start`** (a plain batch CLI, no
   chez-python REPL): it loads libpython3, initialises Python and hands the
   config file to the runner as a normal command-line argument. The wrapper
