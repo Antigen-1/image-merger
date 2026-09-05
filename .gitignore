@@ -5,3 +5,6 @@ __pycache__
 *.pyc
 examples/img*.png
 examples/out.png
+*.wpo
+*.so
+*.boot

@@ -5,34 +5,53 @@ PY   := $(VENV)/bin/python
 
 BUILD_DIR := .build
 BOOT      := $(BUILD_DIR)/image-merger.boot
+MAIN_SO   := $(BUILD_DIR)/im-main.so
+MAIN_SS   := $(BUILD_DIR)/im-main.ss
 
-# Locate the boot file of the installed chez-python (a symlink to the Chez
-# Scheme binary; its boot file sits next to the real binary).
+# The installed chez-python (on $PATH) is used to *build* the boot file: its
+# in-process library registry resolves the chez-python imports of our libraries
+# during make-boot-file, so no chez-python source tree or library path is
+# needed.  Its boot file is used as the chain base of our own boot.
 CHZ_BOOT := $(shell dirname $(shell readlink -f $(shell command -v chez-python)))/chez-python.boot
 
-# The Scheme libraries compiled into the cached boot.
-IM_SLS := image-merger/config.sls image-merger/layout.sls image-merger/spec.sls
+# The image-merger Scheme libraries compiled into the cached boot.
+IM_SLS := image-merger/config.sls image-merger/layout.sls \
+          image-merger/spec.sls image-merger/runner.sls
 
 all: test
 
 # --- Compile the Scheme code once into a cached chain boot ------------------
-# image-merger.boot = chez-python.boot (embeds the Python startup program and
-# the chez-python env bindings) + the compiled image-merger libraries.  `make
-# run` then loads that boot instead of recompiling the libraries every time.
+# image-merger.boot = the installed chez-python boot (chain base, provides
+# the chez-python libraries) + the image-merger libraries + our own whole
+# program with a custom scheme-start (im-main.ss).  The boot is built by
+# chez-python itself (its loaded libraries resolve our imports at compile
+# time); running it starts our program directly: no chez-python REPL, no
+# script loading - the config file is a plain argv argument.
 build: $(BOOT)
 
-$(BOOT): $(IM_SLS) $(CHZ_BOOT)
+# Our boot program: whole-program compile im-main.ss inside the build dir so
+# all intermediate .wpo/.so files stay in .build/.
+$(MAIN_SO): im-main.ss
+	@mkdir -p $(BUILD_DIR)
+	@cp im-main.ss $(MAIN_SS)
+	@echo '(compile-imported-libraries #t)(generate-wpo-files #t)' \
+	      '(compile-program "$(abspath $(MAIN_SS))")' | chez-python -q
+	@echo '(compile-whole-program "$(abspath $(BUILD_DIR)/im-main.wpo)"' \
+	      '"$(abspath $(MAIN_SO))" #t)' | chez-python -q
+
+$(BOOT): $(IM_SLS) $(MAIN_SO) $(CHZ_BOOT)
 	@mkdir -p $(BUILD_DIR)
 	@echo "(make-boot-file \"$(abspath $(BOOT)).tmp\" '(\"scheme\") \
 	       \"$(CHZ_BOOT)\" \
-	       $(foreach f,$(IM_SLS),\"$(abspath $(f))\" ))" | scheme -q
+	       $(foreach f,$(IM_SLS),\"$(abspath $(f))\" )\
+	       \"$(abspath $(MAIN_SO))\" )" | chez-python -q
 	@mv "$(abspath $(BOOT)).tmp" "$(abspath $(BOOT))"
 	@echo "built $(BOOT)"
 
 # --- Run with a config file:  make run CFG=<config-file> --------------------
 run: build
 	@test -n '$(CFG)' || { echo "usage: make run CFG=<config-file>  (e.g. CFG=examples/demo.cfg)" >&2; exit 2; }
-	@IMAGE_MERGER_BOOT="$(abspath $(BOOT))" bin/image-merger "$(CFG)"
+	@bin/image-merger "$(CFG)"
 
 # --- Python venv (Pillow backend) -----------------------------------------
 venv: $(PY)
@@ -53,11 +72,11 @@ test: install
 	scheme-script tests/test-layout.sps && \
 	scheme-script tests/test-spec.sps
 
-# --- Demo (end-to-end through chez-python + Pillow) -----------------------
+# --- Demo (end-to-end through the cached boot + Pillow) -------------------
 fixtures: venv
 	$(PY) examples/gen-fixtures.py
 
-demo: fixtures
+demo: build fixtures
 	bin/image-merger examples/demo.cfg
 
 clean:

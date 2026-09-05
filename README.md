@@ -25,34 +25,41 @@ make install   # akku install (fetches chez-srfi for the tests)
 ```sh
 make build                          # compile the Scheme code once
 make run CFG=examples/demo.cfg      # run with a config file
+bin/image-merger <config-file>      # same, directly
 ```
 
-- `make build` creates a cached **chain boot** `.build/image-merger.boot`:
-  `chez-python.boot` (the installed runtime — its startup program initialises
-  Python and provides the `pyimport`/`pyapply`/... bindings) plus the compiled
-  `(image-merger config/layout/spec)` libraries. The boot is rebuilt
-  automatically when the libraries or the installed chez-python boot change.
-- `make run CFG=<config-file>` loads that boot and runs the merger, so the
-  Scheme libraries are not recompiled on every run; the config file is passed
-  as the `CFG` argument.
+- `make build` creates the cached **boot file** `.build/image-merger.boot`,
+  built *by chez-python*: the installed `chez-python.boot` acts as the chain
+  base (it supplies the chez-python libraries) and the compiled
+  `(image-merger config/layout/spec/runner)` libraries plus our own whole
+  program (`im-main.ss`) are linked on top. The boot is rebuilt automatically
+  when the libraries or the installed chez-python boot change.
+- The boot carries its own **custom `scheme-start`** (a plain batch CLI, no
+  chez-python REPL): it loads libpython3, initialises Python and hands the
+  config file to the runner as a normal command-line argument. The wrapper
+  loads the boot with `scheme -b`.
+- `make run CFG=<config-file>` / `bin/image-merger <config-file>` therefore
+  never recompile the Scheme libraries; `--help` prints usage, exit status is
+  0/1/2 (ok / runtime error / usage error).
 
 ## Usage
 
 Write a config file (see `examples/demo.cfg`) and run:
 
 ```sh
-bin/image-merger <config-file>      # source mode (no cached boot)
-make run CFG=<config-file>          # boot mode (compiled once, cached)
+bin/image-merger <config-file>
+make run CFG=<config-file>
+bin/image-merger --help
 ```
 
 Image and output paths inside the config are resolved **relative to the config
 file's directory**.
 
 > **Note on the Python runtime.** `bin/image-merger` preloads `libpython3.so`
-> via `LD_PRELOAD` before starting chez-python. chez-python dlopens libpython3
-> with local symbol visibility, which otherwise makes Python's C-extension
+> via `LD_PRELOAD` before starting the boot. The embedded Python interpreter
+> is dlopened with local symbol visibility, which makes Python's C-extension
 > modules (`math`, Pillow's `_imaging`, ...) fail to resolve the CPython API
-> with "undefined symbol: PyFloat_Type".
+> with "undefined symbol: PyFloat_Type" — preloading fixes that.
 
 ## Configuration format
 
@@ -133,7 +140,9 @@ make test
 image-merger/
   Akku.manifest            ; akku package metadata (dev dep: chez-srfi)
   Makefile
-  main.ss                  ; loaded by chez-python (FFI boundary)
+  im-main.ss                ; boot program: custom scheme-start (batch CLI)
+  image-merger/
+    runner.sls               ; (image-merger runner)  Python-boundary orchestration
   bin/image-merger         ; wrapper: resolves paths, execs chez-python
   image-merger/
     config.sls             ; (image-merger config)  s-exp read + validation
