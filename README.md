@@ -67,55 +67,122 @@ file's directory**.
 
 ## Configuration format
 
+The configuration is a single s-expression whose top-level form is
+`(image-merger …)`. Image and output paths are resolved **relative to the
+config file's directory**. Validation errors abort with exit status 1.
+
+### Top-level structure
+
 ```scheme
 (image-merger
-  (output "out.png")
-
-  (canvas
-    (background "#1a1a2e")   ; color name / "#rrggbb" / "transparent"
-    (margin 20)              ; (margin <n>) or (margin <top> <right> <bottom> <left>)
-    (gap 10 10)              ; (gap <n>) or (gap <x> <y>)
-    (cell-size 160 120)      ; width height of each cell
-    (grid 2 3))              ; (rows columns)
-
-  ;; Only cells that should show an image need to be listed; every other cell
-  ;; is left empty (the background shows through).
-  (cell (row 0) (column 0) (image "img0.png")
-        (scale fit)                  ; fit | fill | stretch | none | (exact <w> <h>)
-        (align center middle))       ; left|center|right  ×  top|middle|bottom
-
-  (cell (row 1) (column 2) (image "img4.png")
-        (scale (exact 80 60)) (align left top))
-
-  ;; Optional row/column number labels.
-  (row-labels
-    (band 28)                ; label band thickness in pixels
-    (start 1)                ; first row number
-    (style (size 14) (color "#ffffff") (align right middle)))
-  (column-labels
-    (band 24)
-    (style (size 14) (color "#ffffff") (align center bottom))
-    (texts "A" "B" "C")))   ; optional custom texts (default: column numbers)
+  (output <string>)              ; required: output image path
+  (canvas  <clause>*)            ; required: canvas / grid definition
+  (cell    <clause>*)*           ; optional: one clause per filled cell
+  (row-labels    <clause>*)      ; optional: row-number band on the left
+  (column-labels <clause>*))     ; optional: column-number band on top
 ```
+
+### `canvas` clauses
+
+| clause | value | default |
+|---|---|---|
+| `(grid <rows> <cols>)` | positive integers | **required** |
+| `(cell-size <w> <h>)` | positive integers | **required** (cell size in px) |
+| `(gap <n>)` or `(gap <x> <y>)` | non-negative integers | `0` (x/y gaps may differ) |
+| `(margin <n>)` or `(margin <top> <right> <bottom> <left>)` | non-negative integers | `0` |
+| `(background <string>)` | colour name / `#rgb` / `#rrggbb` / `#rrggbbaa` / `"transparent"` | `"#ffffff"` (`transparent` yields an RGBA canvas) |
+
+### `cell` clauses (one per filled cell)
+
+```scheme
+(cell (row <i>) (column <j>)      ; required: 0-based cell coordinates
+      (image <path>)              ; required: image path (relative to config)
+      (scale <mode>)              ; default fit
+      (align <h> <v>))            ; default (center middle)
+```
+
+Only cells that should show an image need to be listed; every other cell is
+left empty (the background shows through).
 
 ### Scale modes
 
 | mode | behaviour |
 |------|-----------|
-| `fit` | scale to fit inside the cell, preserving aspect ratio |
+| `fit` | scale to fit inside the cell, preserving aspect ratio (small images are scaled **up**) |
 | `fill` | scale to cover the cell, cropping the overflow |
 | `stretch` | stretch to the exact cell size (ignores aspect ratio) |
-| `none` | keep the original size |
+| `none` | keep the original size (parts outside the cell are cropped) |
 | `(exact <w> <h>)` | scale to the given pixel size |
 
-`align` decides where the image sits inside its cell (or, for `fill`, which
-part is cropped).
+`align` (`h ∈ left\|center\|right`, `v ∈ top\|middle\|bottom`) decides where
+the image sits inside its cell (for `fit`/`none`/`exact`) or which part is
+cropped (for `fill`).
 
-### Label style
+### Label clauses
 
-Inside `(style ...)`, all of `(font <path>)`, `(size <n>)`, `(color <color>)`
-and `(align <h> <v>)` are optional. `font` defaults to Pillow's built-in
-bitmap font; give a TTF/OTF path for nicer labels.
+```scheme
+(row-labels                       ; column-labels is identical
+  (band <n>)                    ; required: band thickness in px (added to canvas)
+  (start <n>)                   ; default 0: first number shown
+  (texts <string> ...)          ; optional: custom texts (may be shorter than
+                                ; the row/column count); default: start, start+1, …
+  (style
+    (font <path-or-#f>)         ; default #f -> Pillow built-in bitmap font
+    (size <n>)                  ; default 12
+    (color <string>)            ; default "#000000"
+    (align <h> <v>)))           ; default (center middle): text anchor in band
+```
+
+All `(style …)` items are optional and default independently. Row labels sit
+in a band on the **left**, column labels in a band on the **top**.
+
+### Geometry
+
+```
+canvas width  = margin-left  + row-label band + cols × cell-width
+                + (cols-1) × gap-x + margin-right
+canvas height = margin-top   + column-label band + rows × cell-height
+                + (rows-1) × gap-y + margin-bottom
+cell (i,j) top-left = (origin-x + j × (cell-width + gap-x),
+                       origin-y + i × (cell-height + gap-y))
+```
+
+### Full example
+
+```scheme
+(image-merger
+  (output "out.png")
+  (canvas
+    (background "#1a1a2e")     ; dark background
+    (margin 20)                ; 20 px on all sides
+    (gap 10 10)                ; 10 px x / y gaps
+    (cell-size 160 120)        ; 160×120 per cell
+    (grid 2 3))                ; 2 rows × 3 columns
+  ;; row 0: all three cells filled
+  (cell (row 0) (column 0) (image "img0.png") (scale fit))      ; contain
+  (cell (row 0) (column 1) (image "img1.png") (scale fill))      ; cover + crop
+  (cell (row 0) (column 2) (image "img2.png") (scale stretch))   ; distort
+  ;; row 1: column 0 is intentionally omitted -> empty cell (background shows)
+  (cell (row 1) (column 1) (image "img3.png") (scale none) (align right bottom))
+  (cell (row 1) (column 2) (image "img4.png") (scale (exact 80 60)) (align left top))
+  (row-labels                    ; row numbers 1, 2 on the left
+    (band 28)
+    (start 1)
+    (style (size 14) (color "#ffffff") (align right middle)))
+  (column-labels                 ; column names A, B, C on top
+    (band 24)
+    (style (size 14) (color "#ffffff") (align center bottom))
+    (texts "A" "B" "C")))
+```
+
+Minimal configuration (everything else at its default):
+
+```scheme
+(image-merger
+  (output "out.png")
+  (canvas (grid 1 1) (cell-size 100 100))
+  (cell (row 0) (column 0) (image "a.png")))
+```
 
 ## Running the demo
 
