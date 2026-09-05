@@ -1,0 +1,49 @@
+#!/bin/sh
+# image-merger — stitch images according to an s-exp config, driven by the
+# installed chez-python runtime and the project-local Pillow venv.
+#
+# Two execution modes:
+#   * default:      exec chez-python (installed boot) which loads main.ss
+#   * boot mode:    exec `scheme -b $IMAGE_MERGER_BOOT` when IMAGE_MERGER_BOOT
+#                   points at a cached chain boot (see `make build`); the boot
+#                   embeds chez-python plus the compiled image-merger libraries,
+#                   so main.ss loads its imports from the boot instead of
+#                   compiling the library sources.
+set -eu
+
+ROOT=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
+
+if [ "$#" -ne 1 ]; then
+    echo "usage: image-merger <config-file>" >&2
+    exit 2
+fi
+
+# Resolve the config path to an absolute path so relative image paths in the
+# config are resolved against the config's own directory.
+CONFIG=$(CDPATH='' cd -- "$(dirname -- "$1")" && pwd)/$(basename "$1")
+
+export IMAGE_MERGER_ROOT="$ROOT"
+export IMAGE_MERGER_CONFIG="$CONFIG"
+# Make the project's own libraries importable from main.ss (source mode; in
+# boot mode the libraries come from the cached boot instead).
+export CHEZSCHEMELIBDIRS="$ROOT${CHEZSCHEMELIBDIRS:+:$CHEZSCHEMELIBDIRS}"
+
+# chez-python embeds the Python interpreter by dlopen'ing libpython3 with local
+# symbol visibility, so Python's C-extension stdlib modules (math, _struct,
+# ... and Pillow's _imaging) cannot resolve the CPython API and fail with
+# "undefined symbol: PyFloat_Type".  LD_PRELOAD loads libpython3 with global
+# scope (RTLD_GLOBAL) before chez-python starts, which fixes that.
+case ":$LD_PRELOAD:" in
+  *:libpython3*:*|*/libpython3*) ;;
+  *)
+    LIBPYTHON=$(ldconfig -p 2>/dev/null | awk '/^[[:space:]]*libpython3\.so /{print $NF; exit}')
+    [ -n "$LIBPYTHON" ] || LIBPYTHON=libpython3.so
+    export LD_PRELOAD="$LIBPYTHON${LD_PRELOAD:+:$LD_PRELOAD}"
+    ;;
+esac
+
+if [ -n "${IMAGE_MERGER_BOOT:-}" ]; then
+    exec scheme -q -b "$IMAGE_MERGER_BOOT" "$ROOT/main.ss"
+else
+    exec chez-python "$ROOT/main.ss"
+fi

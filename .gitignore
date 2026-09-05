@@ -1,0 +1,7 @@
+.akku
+.venv
+.build
+__pycache__
+*.pyc
+examples/img*.png
+examples/out.png
