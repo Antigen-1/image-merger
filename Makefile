@@ -1,4 +1,4 @@
-.PHONY: all build install run venv test demo fixtures clean
+.PHONY: all build install run venv test integration demo fixtures clean
 
 VENV := .venv
 PY   := $(VENV)/bin/python
@@ -71,6 +71,10 @@ test: install
 	scheme-script tests/test-config.sps && \
 	scheme-script tests/test-layout.sps && \
 	scheme-script tests/test-spec.sps
+
+# --- Integration tests (CLI + pixel checks via the built boot) ------------
+integration: build venv
+	$(PY) tests/test-integration.py
 
 # --- Demo (end-to-end through the cached boot + Pillow) -------------------
 fixtures: venv
