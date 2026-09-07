@@ -246,4 +246,9 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except OSError as exc:
+        # A failed run must surface as a clean FAIL, not a traceback.
+        print(f"  FAIL: harness I/O error: {exc}")
+        sys.exit(1)
