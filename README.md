@@ -9,7 +9,12 @@ the [chez-python](https://github.com/Antigen-1/chez-python) runtime.
 
 - Chez Scheme with `chez-python` installed and on `$PATH`
   (the `chez-python` boot file that embeds the Python C API).
-- Python 3 with `venv` (Pillow is installed into the project-local `.venv`).
+- Python **>= 3.13** with `venv` (Pillow is installed into the project-local
+  `.venv`).  The floor is chez-python's own contract
+  (`current-python-version` requires 3.13+); image-merger itself uses no
+  3.14-only API (`PyInitConfig` etc. are never called).  The venv's Python
+  minor version must match the system `libpython3.so` that chez-python
+  dlopens.
 - [akku](https://akkuscm.org/) for the dev/test dependency `chez-srfi`
   (`srfi :64`).
 
@@ -257,7 +262,8 @@ Verified target: **Linux x86-64 (glibc)**.  Other platforms are best-effort:
   (`sysconfig.get_path("purelib")`, which handles `lib` vs `lib64` and any
   venv layout) and injects it plus the `python/` backend dir through
   `PYTHONPATH`, which the embedded interpreter honours.  The venv must be
-  created with a Python whose minor version matches the embedded libpython.
+  created with a Python >= 3.13 whose minor version matches the embedded
+  libpython.
 
 ## License
 
