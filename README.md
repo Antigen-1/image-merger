@@ -251,9 +251,13 @@ Verified target: **Linux x86-64 (glibc)**.  Other platforms are best-effort:
   untested; Windows is unsupported (shell wrapper, preload mechanism, path
   separators).
 - **Path handling** is Unix-style ('/' separators, config-relative
-  resolution); paths containing spaces work.  The venv must be created with a
-  Python whose minor version matches the embedded libpython (the runner
-  derives the site-packages path from the embedded version).
+  resolution); paths containing spaces work.  The **boot is layout-agnostic**:
+  it contains no venv or directory assumptions.  `bin/image-merger` derives
+  the venv's site-packages at run time from the venv's own python
+  (`sysconfig.get_path("purelib")`, which handles `lib` vs `lib64` and any
+  venv layout) and injects it plus the `python/` backend dir through
+  `PYTHONPATH`, which the embedded interpreter honours.  The venv must be
+  created with a Python whose minor version matches the embedded libpython.
 
 ## License
 
