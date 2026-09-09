@@ -33,6 +33,9 @@ exit status: 0 ok; 1 runtime error; 2 usage error
 (define (say-usage port)
   (display usage-text port))
 
+;; Which stage raised, for actionable errors
+(define *stage* 'start)
+
 ;; Format a condition like the Chez/chez-python runtime would: apply the
 ;; message template to its irritants when a format condition is present.
 (define (condition-text exn)
@@ -53,11 +56,13 @@ exit status: 0 ok; 1 runtime error; 2 usage error
      (exit 0))
     (else
      (guard (exn (else
+                  (display (format "[~a] " *stage*) (current-error-port))
                   (display (condition-text exn) (current-error-port))
                   (newline (current-error-port))
                   (exit 1)))
        ;; Stage 1: libpython3 must be loaded before anything from the
        ;; chez-python environment libraries is instantiated.
+       (set! *stage* 'load-python)
        (let ((e1 (copy-environment
                   (environment '(chezscheme)
                                '(chez-python ffi system)
@@ -69,6 +74,7 @@ exit status: 0 ok; 1 runtime error; 2 usage error
                e1))
        ;; Stage 2: full environment with the Python object API + the merger
        ;; runner, then initialise Python and run.
+       (set! *stage* 'env)
        (let ((e2 (copy-environment
                   (environment '(chezscheme)
                                '(chez-python ffi env api)
@@ -77,6 +83,8 @@ exit status: 0 ok; 1 runtime error; 2 usage error
                                '(chez-python ffi config)
                                '(image-merger runner))
                   #t)))
+         (set! *stage* 'initialize-python)
          (eval '(initialize-python) e2)
+         (set! *stage* 'run)
          (eval `(run ,(car args)) e2))
        (exit 0))))))

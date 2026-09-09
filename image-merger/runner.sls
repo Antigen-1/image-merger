@@ -25,11 +25,26 @@
   (define (python-str obj)
     (pyapply (object-get-attr (pyimport "builtins") "str") (list obj)))
 
+  (define (load-merge)
+    ;; Importing the backend outside of the call handler would surface only
+    ;; chez-python's generic "Unknown internal errors" message; record the
+    ;; python error here and raise it after the handler returns (raising
+    ;; inside the handler body does not propagate reliably).
+    (define pyerr #f)
+    (define merge
+      (with-python-runtime-handler
+       (lambda (exn pyexn)
+         (set! pyerr (python-str pyexn)))
+       (object-get-attr (pyimport "imagemerger") "merge")))
+    (when pyerr
+      (errorf 'image-merger "python backend: ~a" pyerr))
+    merge)
+
   (define (run config-path)
     (let* ((cfg (read-config config-path))
            (lay (compute-layout cfg))
            (spec (layout->spec lay))
-           (merge (object-get-attr (pyimport "imagemerger") "merge")))
+           (merge (load-merge)))
       (with-python-runtime-handler
        (lambda (exn pyexn)
          (errorf 'image-merger "python backend: ~a" (python-str pyexn)))

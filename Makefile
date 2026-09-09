@@ -32,7 +32,7 @@ PYBS_FLAVOR := install_only_stripped
 HOST_ARCH := $(shell uname -m)
 HOST_LIBC := $(shell (ldd --version 2>&1 | head -1 | grep -qi musl) && echo musl || echo gnu)
 PYBS_TARGET ?= $(HOST_ARCH)-unknown-linux-$(HOST_LIBC)
-PYBS_TGZ  := $(CACHE_DIR)/python-build-standalone-$(PYBS_VER)-$(PYBS_FLAVOR).tar.gz
+PYBS_TGZ  := $(CACHE_DIR)/python-build-standalone-$(PYBS_VER)-$(PYBS_TARGET)-$(PYBS_FLAVOR).tar.gz
 # URL of the $(PYBS_FLAVOR) build for $(PYBS_TARGET) (override for mirrors).
 PYBS_URL  := https://github.com/astral-sh/python-build-standalone/releases/download/$(PYBS_VER)/cpython-$(PYBS_PY)+$(PYBS_VER)-$(PYBS_TARGET)-$(PYBS_FLAVOR).tar.gz
 # Optional sha256 of $(PYBS_TGZ); leave empty to skip verification.  The
