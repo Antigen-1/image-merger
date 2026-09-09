@@ -37,7 +37,7 @@ SCHEME_DIR  := $(dir $(SCHEME_REAL))
 $(PYBS_TGZ):
 	@mkdir -p $(CACHE_DIR)
 	@echo "downloading python-build-standalone $(PYBS_PY) ($(PYBS_VER)) ..."
-	@curl -fL --retry 3 -o "$@.tmp" "$(PYBS_URL)"
+	@wget --tries=3 -O "$@.tmp" "$(PYBS_URL)"
 	@if [ -n "$(PYBS_SHA)" ]; then echo "$(PYBS_SHA)  $@.tmp" | sha256sum -c -; fi
 	@mv "$@.tmp" "$@"
 
