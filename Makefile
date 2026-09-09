@@ -27,7 +27,7 @@ PYBS_TGZ  := $(CACHE_DIR)/python-build-standalone-$(PYBS_VER).tar.gz
 # URL of the install_only glibc x86_64 build (override for mirrors).
 PYBS_URL  := https://github.com/astral-sh/python-build-standalone/releases/download/$(PYBS_VER)/cpython-$(PYBS_PY)+$(PYBS_VER)-x86_64-unknown-linux-gnu-install_only.tar.gz
 # Optional sha256 of $(PYBS_TGZ); leave empty to skip verification.
-PYBS_SHA  :=
+PYBS_SHA  := 0ab3305457051cd3e7c031857e005f1bda17c218a1990567dacaaac6dd1d14f0
 
 # Where the installed Chez Scheme keeps its kernel boot files: next to the
 # real scheme binary (readlink -f resolves symlinks such as /usr/bin/scheme).
