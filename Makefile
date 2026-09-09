@@ -23,19 +23,23 @@ DIST_BIN  := $(DIST_DIR)/bin
 CACHE_DIR := .downloads
 PYBS_VER  := 20260901
 PYBS_PY   := 3.14.7
-PYBS_TGZ  := $(CACHE_DIR)/python-build-standalone-$(PYBS_VER).tar.gz
+# install_only_stripped: ~36 MB vs ~122 MB for install_only, keeps pip,
+# headers and the bundled licenses (LICENSE.txt) — sufficient because we do
+# not compile extension modules against the bundle.
+PYBS_FLAVOR := install_only_stripped
 # Host architecture/libc are detected at build time (no hardcoded target);
 # override PYBS_TARGET for cross builds or unsupported machines.
 HOST_ARCH := $(shell uname -m)
 HOST_LIBC := $(shell (ldd --version 2>&1 | head -1 | grep -qi musl) && echo musl || echo gnu)
 PYBS_TARGET ?= $(HOST_ARCH)-unknown-linux-$(HOST_LIBC)
-# URL of the install_only build for $(PYBS_TARGET) (override for mirrors).
-PYBS_URL  := https://github.com/astral-sh/python-build-standalone/releases/download/$(PYBS_VER)/cpython-$(PYBS_PY)+$(PYBS_VER)-$(PYBS_TARGET)-install_only.tar.gz
+PYBS_TGZ  := $(CACHE_DIR)/python-build-standalone-$(PYBS_VER)-$(PYBS_FLAVOR).tar.gz
+# URL of the $(PYBS_FLAVOR) build for $(PYBS_TARGET) (override for mirrors).
+PYBS_URL  := https://github.com/astral-sh/python-build-standalone/releases/download/$(PYBS_VER)/cpython-$(PYBS_PY)+$(PYBS_VER)-$(PYBS_TARGET)-$(PYBS_FLAVOR).tar.gz
 # Optional sha256 of $(PYBS_TGZ); leave empty to skip verification.  The
 # pinned value matches the x86_64/glibc artifact; set your own after the first
 # download on another target.
 ifeq ($(PYBS_TARGET),x86_64-unknown-linux-gnu)
-PYBS_SHA  ?= 0ab3305457051cd3e7c031857e005f1bda17c218a1990567dacaaac6dd1d14f0
+PYBS_SHA  ?= 3959f92825141e04adf44982d3a83ee57af0877e893b0796e04c1468749d9b04
 endif
 PYBS_SHA  ?=
 
