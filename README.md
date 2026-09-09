@@ -95,9 +95,17 @@ Write a config file (see `examples/demo.cfg`) and run:
 
 ```sh
 bin/image-merger <config-file>
+bin/image-merger --pythonpath <dirs> <config-file>   # portable form: sets
+                                                      # Python's module path
+                                                      # in-process, no env
 make run CFG=<config-file>
 bin/image-merger --help
 ```
+
+`--pythonpath <dirs>` (colon-separated, repeatable) is prepended to the
+module search path of the embedded interpreter: the program sets `PYTHONPATH`
+itself before `Py_Initialize`, so Pillow and the backend module can come from
+any location without any environment setup by the caller.
 
 Image and output paths inside the config are resolved **relative to the config
 file's directory**.
@@ -279,8 +287,9 @@ the build machine (auto-detected, no hardcoding), so e.g. aarch64 builds use
 the matching python-build-standalone artifact.  Other platforms are best-effort:
 
 - **Run time** needs only `scheme` on `$PATH`, the system `libpython3.so`
-  (same minor as the venv), and the venv with Pillow (>= 9.1, for
-  `Image.Resampling`).  chez-python itself is *not* needed at run time, but
+  (same minor as the venv), and Pillow (>= 9.1, for `Image.Resampling`).
+  Python module paths are passed with `--pythonpath` (or `PYTHONPATH`), never
+  baked into the boot.  chez-python itself is *not* needed at run time, but
   its `chez-python.boot` must be installed where the scheme binary looks for
   boots (the standard chez-python install layout: boot file next to the real
   scheme binary).  Tested with a minimal `PATH=/usr/bin:/bin` environment.

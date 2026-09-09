@@ -43,7 +43,8 @@ if [ ! -x "$ROOT/.venv/bin/python" ]; then
     exit 2
 fi
 VENV_SITE=$("$ROOT/.venv/bin/python" -c 'import sysconfig; print(sysconfig.get_path("purelib"))')
-export PYTHONPATH="$VENV_SITE:$ROOT/python${PYTHONPATH:+:$PYTHONPATH}"
+PYTHONPATH_ARG="--pythonpath"
+PYTHONPATH_VALUE="$VENV_SITE:$ROOT/python"
 
 # chez-python embeds the Python interpreter by dlopen'ing libpython3 with local
 # symbol visibility, so Python's C-extension stdlib modules (math, _struct,
@@ -59,4 +60,4 @@ case ":${LD_PRELOAD:-}:" in
     ;;
 esac
 
-exec scheme -q -b "$BOOT" -- "$CONFIG"
+exec scheme -q -b "$BOOT" -- "$PYTHONPATH_ARG" "$PYTHONPATH_VALUE" "$CONFIG"

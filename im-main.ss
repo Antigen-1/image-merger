@@ -18,17 +18,58 @@
 (import (chezscheme) (rnrs conditions))
 
 (define usage-text
-  "usage: image-merger <config-file>
+  "usage: image-merger [--pythonpath <dirs>] <config-file>
 
 Stitch images onto a grid according to an s-exp config file (see README).
-Requires the cached boot built by `make build` (.build/image-merger.boot)
-and the project venv created by `make venv`.
+Requires the cached boot built by `make build` (.build/image-merger.boot).
 
 options:
-  -h, --help    show this help and exit
+  --pythonpath <dirs>  colon-separated directories prepended to Python's
+                       module search path (repeatable); set before the
+                       embedded interpreter is initialised, so Pillow and the
+                       backend module can come from any location
+  -h, --help           show this help and exit
 
 exit status: 0 ok; 1 runtime error; 2 usage error
 ")
+
+;; Parse args: [--pythonpath dirs]* config
+(define (starts-with-dash? s)
+  (and (> (string-length s) 0) (char=? (string-ref s 0) #\-)))
+
+(define (parse-args args)
+  (let loop ((rest args) (pp '()) (pos '()))
+    (cond
+     ((null? rest)
+      (if (null? pos)
+          (errorf 'image-merger "usage: image-merger [--pythonpath <dirs>] <config-file>")
+          (values (reverse pp) (reverse pos))))
+     ((or (equal? (car rest) "-h") (equal? (car rest) "--help"))
+      (say-usage (current-output-port))
+      (exit 0))
+     ((equal? (car rest) "--pythonpath")
+      (if (or (null? (cdr rest)) (starts-with-dash? (cadr rest)))
+          (errorf 'image-merger "--pythonpath requires a directory argument")
+          (loop (cddr rest) (cons (cadr rest) pp) pos)))
+     (else
+      (loop (cdr rest) pp (cons (car rest) pos))))))
+
+;; Make the --pythonpath directories visible to the embedded interpreter:
+;; Py_Initialize reads PYTHONPATH from the process environment.
+(define (colon-join strs)
+  (let loop ((l strs) (acc ""))
+    (cond ((null? l) acc)
+          ((string=? acc "") (loop (cdr l) (car l)))
+          (else (loop (cdr l) (format "~a:~a" acc (car l)))))))
+
+(define (apply-pythonpath! pp)
+  (unless (null? pp)
+    (putenv "PYTHONPATH"
+            (let ((extra (colon-join (reverse pp)))
+                  (existing (or (getenv "PYTHONPATH") "")))
+              (if (string=? existing "")
+                  extra
+                  (format "~a:~a" extra existing))))))
 
 (define (say-usage port)
   (display usage-text port))
@@ -47,21 +88,19 @@ exit status: 0 ok; 1 runtime error; 2 usage error
 
 (scheme-start
  (lambda args
-   (cond
-    ((or (null? args) (> (length args) 1))
-     (say-usage (current-error-port))
-     (exit 2))
-    ((member (car args) '("-h" "--help"))
-     (say-usage (current-output-port))
-     (exit 0))
-    (else
-     (guard (exn (else
-                  (display (format "[~a] " *stage*) (current-error-port))
-                  (display (condition-text exn) (current-error-port))
-                  (newline (current-error-port))
-                  (exit 1)))
-       ;; Stage 1: libpython3 must be loaded before anything from the
-       ;; chez-python environment libraries is instantiated.
+   (guard (exn (else
+                (display (format "[~a] " *stage*) (current-error-port))
+                (display (condition-text exn) (current-error-port))
+                (newline (current-error-port))
+                (exit (if (eq? *stage* 'parse) 2 1))))
+     ;; Stage 1: libpython3 must be loaded before anything from the
+     ;; chez-python environment libraries is instantiated.
+     (set! *stage* 'parse)
+     (let-values (((pp config) (parse-args args)))
+       (when (null? config)
+         (say-usage (current-error-port))
+         (exit 2))
+       (apply-pythonpath! pp)
        (set! *stage* 'load-python)
        (let ((e1 (copy-environment
                   (environment '(chezscheme)
@@ -86,5 +125,5 @@ exit status: 0 ok; 1 runtime error; 2 usage error
          (set! *stage* 'initialize-python)
          (eval '(initialize-python) e2)
          (set! *stage* 'run)
-         (eval `(run ,(car args)) e2))
-       (exit 0))))))
+         (eval `(run ,(car config)) e2))
+       (exit 0)))))
