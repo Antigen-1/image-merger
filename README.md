@@ -51,6 +51,9 @@ machine and run there without installing Python, chez-python or Chez Scheme:
   python/               # python-build-standalone CPython (self-contained,
                         # Pillow preinstalled, python/imagemerger.py copied
                         # into its site-packages)
+  start-image-merger.sh # relocatable launcher: resolves paths relative to
+                        # itself, sets LD_LIBRARY_PATH/LD_PRELOAD to the
+                        # bundled python, then execs bin/image-merger
 ```
 
 - Requires network once (downloads the pinned
@@ -59,9 +62,11 @@ machine and run there without installing Python, chez-python or Chez Scheme:
   (`uname -m` + glibc/musl detection); override with `PYBS_TARGET=` for cross
   builds).  A sha256 pinned in the Makefile covers the x86_64/glibc artifact;
   on other targets set `PYBS_SHA=` to your own value (or leave empty).
-- `make run CFG=...` invokes `bin/image-merger` in that directory directly
-  with `LD_LIBRARY_PATH`/`LD_PRELOAD` pointing at the bundled Python, so the
-  embedded interpreter and Pillow's C extensions come from the bundle.
+- `make run CFG=...` and direct invocations both go through
+  `start-image-merger.sh`, which sets `LD_LIBRARY_PATH`/`LD_PRELOAD` pointing
+  at the bundled Python, so the embedded interpreter and Pillow's C
+  extensions come from the bundle.  Run it from anywhere:
+  `dist/start-image-merger.sh <config>`.
 - Bundled third-party components (Chez Scheme, python-build-standalone,
   Pillow) keep their own licenses; review them before redistribution.
 
@@ -79,9 +84,10 @@ machine and run there without installing Python, chez-python or Chez Scheme:
   chez-python REPL): it loads libpython3, initialises Python and hands the
   config file to the runner as a normal command-line argument. The wrapper
   loads the boot with `scheme -b`.
-- `make run CFG=<config-file>` / `bin/image-merger <config-file>` therefore
-  never recompile the Scheme libraries; `--help` prints usage, exit status is
-  0/1/2 (ok / runtime error / usage error).
+- `make run CFG=<config-file>` never recompiles the Scheme libraries; it
+  calls the bundle's `start-image-merger.sh` (which sets up the embedded
+  Python environment and execs `bin/image-merger`).  `bin/image-merger`
+  (dev wrapper) and `--help` / exit statuses 0/1/2 work as before.
 
 ## Usage
 

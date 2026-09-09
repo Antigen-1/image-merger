@@ -67,14 +67,16 @@ $(DIST_PY)/.pillow-stamp: $(PYBS_TGZ) python/imagemerger.py
 # Boots + renamed scheme binary (auto-search chain: image-merger.boot ->
 # chez-python.boot -> scheme.boot -> petite.boot, all in one directory)
 $(DIST_BIN)/image-merger: $(BOOT) $(DIST_PY)/.pillow-stamp
-	@rm -rf $(DIST_BIN) $(DIST_DIR)/LICENSES
+	@rm -rf $(DIST_BIN) $(DIST_DIR)/LICENSES $(DIST_DIR)/start-image-merger.sh
 	@mkdir -p $(DIST_BIN)
 	@cp "$(SCHEME_REAL)" "$(DIST_BIN)/image-merger"
 	@cp "$(SCHEME_DIR)petite.boot" "$(SCHEME_DIR)scheme.boot" $(DIST_BIN)/
 	@cp "$(SCHEME_DIR)chez-python.boot" $(DIST_BIN)/
 	@cp "$(BOOT)" "$(DIST_BIN)/image-merger.boot"
 	@chmod +x "$(DIST_BIN)/image-merger"
-	@# third-party license texts travel with the bundle
+	@# relocatable launcher + third-party license texts travel with the bundle
+	@cp start-image-merger.sh $(DIST_DIR)/start-image-merger.sh
+	@chmod 755 "$(DIST_DIR)/start-image-merger.sh"
 	@mkdir -p $(DIST_DIR)/LICENSES
 	@cp third-party-licenses/*.txt $(DIST_DIR)/LICENSES/
 	@# make dlopen("libpython3.so") resolve to the bundled python
@@ -128,9 +130,7 @@ $(BOOT): $(IM_SLS) $(MAIN_SO)
 # Uses the self-contained dist bundle (builds it on first use).
 run: dist
 	@test -n '$(CFG)' || { echo "usage: make run CFG=<config-file>  (e.g. CFG=examples/demo.cfg)" >&2; exit 2; }
-	@LD_LIBRARY_PATH="$(abspath $(DIST_PY)/lib)$${LD_LIBRARY_PATH:+:$$LD_LIBRARY_PATH}" \
-	  LD_PRELOAD="$(abspath $(DIST_PY)/lib/libpython3.so)$${LD_PRELOAD:+:$$LD_PRELOAD}" \
-	  "$(abspath $(DIST_BIN)/image-merger)" -q -- "$(CFG)"
+	@"$(abspath $(DIST_DIR))/start-image-merger.sh" "$(CFG)"
 
 # --- Python venv (Pillow backend) -----------------------------------------
 venv: $(PY)
