@@ -28,13 +28,43 @@ make install   # akku install (fetches chez-srfi for the tests)
 ## Build & run
 
 ```sh
-make build                          # compile the Scheme code once
-make run CFG=examples/demo.cfg      # run with a config file
-bin/image-merger <config-file>      # same, directly
+make build                          # compile the Scheme code once (dev boot)
+make dist                           # build the relocatable bundle (downloads
+                                    # python-build-standalone once)
+make run CFG=examples/demo.cfg      # run with a config file (uses the bundle)
 ```
 
-- `make build` creates the cached **boot file** `.build/image-merger.boot`
-  (only ~63 KB), built *by chez-python*: the compiled
+### Relocatable distribution (`make dist`)
+
+`make dist` assembles a self-contained directory that can be copied to another
+machine and run there without installing Python, chez-python or Chez Scheme:
+
+```
+.dist/image-merger/
+  bin/
+    image-merger        # copy of the Chez Scheme binary (renamed: the boot
+                        # files are auto-searched next to it)
+    image-merger.boot   # our boot (base: chez-python)
+    chez-python.boot    # chez-python base (base: scheme)
+    scheme.boot         # Chez Scheme kernel
+    petite.boot         # ...and its base
+  python/               # python-build-standalone CPython (self-contained,
+                        # Pillow preinstalled, python/imagemerger.py copied
+                        # into its site-packages)
+```
+
+- Requires network once (downloads the pinned
+  [python-build-standalone](https://github.com/astral-sh/python-build-standalone)
+  release; set `PYBS_SHA` to a sha256 of the tarball to verify it, or leave
+  empty).  Only a glibc x86-64 target machine is supported so far.
+- `make run CFG=...` invokes `bin/image-merger` in that directory directly
+  with `LD_LIBRARY_PATH`/`LD_PRELOAD` pointing at the bundled Python, so the
+  embedded interpreter and Pillow's C extensions come from the bundle.
+- Bundled third-party components (Chez Scheme, python-build-standalone,
+  Pillow) keep their own licenses; review them before redistribution.
+
+- `make build` creates the cached **dev boot file**
+  `.build/image-merger.boot` (only ~63 KB), built *by chez-python*: the compiled
   `(image-merger config/layout/spec/runner)` libraries plus our own whole
   program (`im-main.ss`) are linked **on top of chez-python as the sole base
   image** (`make-boot-file` allowed-libraries `'("chez-python")`). The

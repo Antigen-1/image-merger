@@ -8,6 +8,64 @@ BOOT      := $(BUILD_DIR)/image-merger.boot
 MAIN_SO   := $(BUILD_DIR)/im-main.so
 MAIN_SS   := $(BUILD_DIR)/im-main.ss
 
+# --- Relocatable distribution (make dist) ----------------------------------
+# Bundles a self-contained, copy-to-any-machine directory:
+#   .dist/image-merger/
+#     bin/image-merger        copy of the Chez Scheme binary (boot auto-search
+#                             by executable name), image-merger.boot,
+#                             chez-python.boot, scheme.boot, petite.boot
+#     python/                 python-build-standalone (self-contained CPython,
+#                             Pillow preinstalled, backend module copied in)
+# `make run` invokes bin/image-merger in that directory directly.
+DIST_DIR  := .dist/image-merger
+DIST_PY   := $(DIST_DIR)/python
+DIST_BIN  := $(DIST_DIR)/bin
+CACHE_DIR := .downloads
+PYBS_VER  := 20260901
+PYBS_PY   := 3.14.7
+PYBS_TGZ  := $(CACHE_DIR)/python-build-standalone-$(PYBS_VER).tar.gz
+# URL of the install_only glibc x86_64 build (override for mirrors).
+PYBS_URL  := https://github.com/astral-sh/python-build-standalone/releases/download/$(PYBS_VER)/cpython-$(PYBS_PY)+$(PYBS_VER)-x86_64-unknown-linux-gnu-install_only.tar.gz
+# Optional sha256 of $(PYBS_TGZ); leave empty to skip verification.
+PYBS_SHA  :=
+
+# Where the installed Chez Scheme keeps its kernel boot files: next to the
+# real scheme binary (readlink -f resolves symlinks such as /usr/bin/scheme).
+SCHEME_REAL := $(shell readlink -f $(shell command -v scheme))
+SCHEME_DIR  := $(dir $(SCHEME_REAL))
+
+$(PYBS_TGZ):
+	@mkdir -p $(CACHE_DIR)
+	@echo "downloading python-build-standalone $(PYBS_PY) ($(PYBS_VER)) ..."
+	@curl -fL --retry 3 -o "$@.tmp" "$(PYBS_URL)"
+	@if [ -n "$(PYBS_SHA)" ]; then echo "$(PYBS_SHA)  $@.tmp" | sha256sum -c -; fi
+	@mv "$@.tmp" "$@"
+
+# Pillow + backend module installed into the standalone python
+$(DIST_PY)/.pillow-stamp: $(PYBS_TGZ) python/imagemerger.py
+	@rm -rf $(DIST_PY)
+	@mkdir -p $(DIST_DIR)
+	@tar -xzf $(PYBS_TGZ) -C $(DIST_DIR)
+	@$(DIST_PY)/bin/python3.14 -m pip install --disable-pip-version-check --no-input Pillow
+	@SITE=$$($(DIST_PY)/bin/python3.14 -c 'import sysconfig; print(sysconfig.get_path("purelib"))') && cp python/imagemerger.py "$$SITE/"
+	@touch "$@"
+
+# Boots + renamed scheme binary (auto-search chain: image-merger.boot ->
+# chez-python.boot -> scheme.boot -> petite.boot, all in one directory)
+$(DIST_BIN)/image-merger: $(BOOT) $(DIST_PY)/.pillow-stamp
+	@mkdir -p $(DIST_BIN)
+	@cp "$(SCHEME_REAL)" "$(DIST_BIN)/image-merger"
+	@cp "$(SCHEME_DIR)petite.boot" "$(SCHEME_DIR)scheme.boot" $(DIST_BIN)/
+	@cp "$(SCHEME_DIR)chez-python.boot" $(DIST_BIN)/
+	@cp "$(BOOT)" "$(DIST_BIN)/image-merger.boot"
+	@chmod +x "$(DIST_BIN)/image-merger"
+	@# make dlopen("libpython3.so") resolve to the bundled python
+	@if [ ! -e "$(DIST_PY)/lib/libpython3.so" ]; then 	  ln -s libpython3.so.1.0 "$(DIST_PY)/lib/libpython3.so"; fi
+	@echo "dist ready: $(abspath $(DIST_DIR))"
+
+.PHONY: dist
+dist: $(DIST_BIN)/image-merger
+
 # The installed chez-python (on $PATH) is used to *build* the boot file: its
 # in-process library registry resolves the chez-python imports of our libraries
 # during make-boot-file, so no chez-python source tree or library path is
@@ -49,9 +107,12 @@ $(BOOT): $(IM_SLS) $(MAIN_SO)
 	@echo "built $(BOOT)"
 
 # --- Run with a config file:  make run CFG=<config-file> --------------------
-run: build
+# Uses the self-contained dist bundle (builds it on first use).
+run: dist
 	@test -n '$(CFG)' || { echo "usage: make run CFG=<config-file>  (e.g. CFG=examples/demo.cfg)" >&2; exit 2; }
-	@bin/image-merger "$(CFG)"
+	@LD_LIBRARY_PATH="$(abspath $(DIST_PY)/lib)$${LD_LIBRARY_PATH:+:$$LD_LIBRARY_PATH}" \
+	  LD_PRELOAD="$(abspath $(DIST_PY)/lib/libpython3.so)$${LD_PRELOAD:+:$$LD_PRELOAD}" \
+	  "$(abspath $(DIST_BIN)/image-merger)" -q -- "$(CFG)"
 
 # --- Python venv (Pillow backend) -----------------------------------------
 venv: $(PY)

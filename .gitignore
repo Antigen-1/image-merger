@@ -8,3 +8,5 @@ examples/out.png
 *.wpo
 *.so
 *.boot
+.dist
+.downloads
