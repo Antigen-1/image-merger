@@ -53,12 +53,16 @@ $(DIST_PY)/.pillow-stamp: $(PYBS_TGZ) python/imagemerger.py
 # Boots + renamed scheme binary (auto-search chain: image-merger.boot ->
 # chez-python.boot -> scheme.boot -> petite.boot, all in one directory)
 $(DIST_BIN)/image-merger: $(BOOT) $(DIST_PY)/.pillow-stamp
+	@rm -rf $(DIST_BIN) $(DIST_DIR)/LICENSES
 	@mkdir -p $(DIST_BIN)
 	@cp "$(SCHEME_REAL)" "$(DIST_BIN)/image-merger"
 	@cp "$(SCHEME_DIR)petite.boot" "$(SCHEME_DIR)scheme.boot" $(DIST_BIN)/
 	@cp "$(SCHEME_DIR)chez-python.boot" $(DIST_BIN)/
 	@cp "$(BOOT)" "$(DIST_BIN)/image-merger.boot"
 	@chmod +x "$(DIST_BIN)/image-merger"
+	@# third-party license texts travel with the bundle
+	@mkdir -p $(DIST_DIR)/LICENSES
+	@cp third-party-licenses/*.txt $(DIST_DIR)/LICENSES/
 	@# make dlopen("libpython3.so") resolve to the bundled python
 	@if [ ! -e "$(DIST_PY)/lib/libpython3.so" ]; then 	  ln -s libpython3.so.1.0 "$(DIST_PY)/lib/libpython3.so"; fi
 	@echo "dist ready: $(abspath $(DIST_DIR))"

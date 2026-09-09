@@ -297,4 +297,9 @@ Verified target: **Linux x86-64 (glibc)**.  Other platforms are best-effort:
 
 ## License
 
-MIT — see `LICENSE`.
+image-merger itself is **MIT** — see `LICENSE`.
+
+The relocatable bundle (`make dist`) redistributes third-party components
+(Chez Scheme, chez-python, CPython/python-build-standalone, Pillow); their
+licenses and obligations are listed in `THIRD-PARTY-NOTICES.md`, and `make
+dist` copies the full license texts into `.dist/image-merger/LICENSES/`.
