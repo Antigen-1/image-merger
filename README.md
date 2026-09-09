@@ -55,8 +55,10 @@ machine and run there without installing Python, chez-python or Chez Scheme:
 
 - Requires network once (downloads the pinned
   [python-build-standalone](https://github.com/astral-sh/python-build-standalone)
-  release; set `PYBS_SHA` to a sha256 of the tarball to verify it, or leave
-  empty).  Only a glibc x86-64 target machine is supported so far.
+  release for the **host architecture/libc, detected at build time**
+  (`uname -m` + glibc/musl detection); override with `PYBS_TARGET=` for cross
+  builds).  A sha256 pinned in the Makefile covers the x86_64/glibc artifact;
+  on other targets set `PYBS_SHA=` to your own value (or leave empty).
 - `make run CFG=...` invokes `bin/image-merger` in that directory directly
   with `LD_LIBRARY_PATH`/`LD_PRELOAD` pointing at the bundled Python, so the
   embedded interpreter and Pillow's C extensions come from the bundle.
@@ -266,7 +268,9 @@ image-merger/
 
 ## Portability
 
-Verified target: **Linux x86-64 (glibc)**.  Other platforms are best-effort:
+Verified target: **Linux x86-64 (glibc)** — the bundle architecture follows
+the build machine (auto-detected, no hardcoding), so e.g. aarch64 builds use
+the matching python-build-standalone artifact.  Other platforms are best-effort:
 
 - **Run time** needs only `scheme` on `$PATH`, the system `libpython3.so`
   (same minor as the venv), and the venv with Pillow (>= 9.1, for

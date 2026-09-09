@@ -24,10 +24,20 @@ CACHE_DIR := .downloads
 PYBS_VER  := 20260901
 PYBS_PY   := 3.14.7
 PYBS_TGZ  := $(CACHE_DIR)/python-build-standalone-$(PYBS_VER).tar.gz
-# URL of the install_only glibc x86_64 build (override for mirrors).
-PYBS_URL  := https://github.com/astral-sh/python-build-standalone/releases/download/$(PYBS_VER)/cpython-$(PYBS_PY)+$(PYBS_VER)-x86_64-unknown-linux-gnu-install_only.tar.gz
-# Optional sha256 of $(PYBS_TGZ); leave empty to skip verification.
-PYBS_SHA  := 0ab3305457051cd3e7c031857e005f1bda17c218a1990567dacaaac6dd1d14f0
+# Host architecture/libc are detected at build time (no hardcoded target);
+# override PYBS_TARGET for cross builds or unsupported machines.
+HOST_ARCH := $(shell uname -m)
+HOST_LIBC := $(shell (ldd --version 2>&1 | head -1 | grep -qi musl) && echo musl || echo gnu)
+PYBS_TARGET ?= $(HOST_ARCH)-unknown-linux-$(HOST_LIBC)
+# URL of the install_only build for $(PYBS_TARGET) (override for mirrors).
+PYBS_URL  := https://github.com/astral-sh/python-build-standalone/releases/download/$(PYBS_VER)/cpython-$(PYBS_PY)+$(PYBS_VER)-$(PYBS_TARGET)-install_only.tar.gz
+# Optional sha256 of $(PYBS_TGZ); leave empty to skip verification.  The
+# pinned value matches the x86_64/glibc artifact; set your own after the first
+# download on another target.
+ifeq ($(PYBS_TARGET),x86_64-unknown-linux-gnu)
+PYBS_SHA  ?= 0ab3305457051cd3e7c031857e005f1bda17c218a1990567dacaaac6dd1d14f0
+endif
+PYBS_SHA  ?=
 
 # Where the installed Chez Scheme keeps its kernel boot files: next to the
 # real scheme binary (readlink -f resolves symlinks such as /usr/bin/scheme).
